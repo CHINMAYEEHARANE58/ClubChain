@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: clubchain-backend
+  namespace: clubchain
+spec:
+  type: ClusterIP
+  selector:
+    app: clubchain-backend
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP

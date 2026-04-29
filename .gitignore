@@ -1,0 +1,12 @@
+node_modules
+.env
+.env.*
+!.env.example
+.DS_Store
+dist
+coverage
+*.log
+.npm
+.npm-cache
+frontend/dist
+backend/dist

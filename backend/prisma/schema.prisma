@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CORE_MEMBER
+  MEMBER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  LEFT
+  REMOVED
+}
+
+enum ProposalStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  APPROVED
+  REJECTED
+  EXECUTED
+  CANCELLED
+}
+
+enum VoteChoice {
+  FOR
+  AGAINST
+  ABSTAIN
+}
+
+enum TreasuryTxnType {
+  CREDIT
+  DEBIT
+}
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  collegeEmail    String    @unique
+  fullName        String    @db.VarChar(120)
+  passwordHash    String?
+  avatarUrl       String?
+  isEmailVerified Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  createdClubs     Club[]                  @relation("club_creator")
+  memberships      ClubMembership[]
+  createdProposals Proposal[]              @relation("proposal_creator")
+  statusChanges    ProposalStatusHistory[]
+  votes            Vote[]                  @relation("vote_user")
+  otpCodes         EmailOtp[]
+  refreshTokens    RefreshToken[]
+  treasuryActions  TreasuryTransaction[]   @relation("treasury_actor")
+  auditActions     AuditLog[]              @relation("audit_actor")
+}
+
+model Club {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(120)
+  slug        String   @unique @db.VarChar(80)
+  description String?
+  createdById String   @db.Uuid
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy       User                  @relation("club_creator", fields: [createdById], references: [id])
+  memberships     ClubMembership[]
+  proposals       Proposal[]
+  votes           Vote[]
+  treasuryAccount TreasuryAccount?
+  treasuryTxns    TreasuryTransaction[]
+  auditLogs       AuditLog[]
+
+  @@index([createdAt])
+}
+
+model ClubMembership {
+  id        String           @id @default(uuid()) @db.Uuid
+  clubId    String           @db.Uuid
+  userId    String           @db.Uuid
+  role      UserRole
+  status    MembershipStatus @default(ACTIVE)
+  joinedAt  DateTime         @default(now())
+  leftAt    DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, userId, status])
+  @@index([userId])
+  @@index([clubId, role])
+}
+
+model EmailOtp {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  otpHash    String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt(sort: Desc)])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Proposal {
+  id                   String         @id @default(uuid()) @db.Uuid
+  clubId               String         @db.Uuid
+  createdById          String         @db.Uuid
+  title                String         @db.VarChar(180)
+  description          String
+  status               ProposalStatus @default(DRAFT)
+  startTime            DateTime?
+  endTime              DateTime?
+  quorumPercent        Decimal        @default(20.00) @db.Decimal(5, 2)
+  passThresholdPercent Decimal        @default(50.00) @db.Decimal(5, 2)
+  treasuryImpactAmount Decimal?       @default(0) @db.Decimal(14, 2)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  club          Club                    @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  createdBy     User                    @relation("proposal_creator", fields: [createdById], references: [id])
+  votes         Vote[]
+  statusHistory ProposalStatusHistory[]
+  treasuryTxns  TreasuryTransaction[]
+
+  @@index([clubId, status, createdAt(sort: Desc)])
+  @@index([clubId, startTime, endTime])
+}
+
+model ProposalStatusHistory {
+  id             String          @id @default(uuid()) @db.Uuid
+  proposalId     String          @db.Uuid
+  previousStatus ProposalStatus?
+  newStatus      ProposalStatus
+  changedById    String?         @db.Uuid
+  reason         String?
+  changedAt      DateTime        @default(now())
+
+  proposal  Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  changedBy User?    @relation(fields: [changedById], references: [id])
+
+  @@index([proposalId, changedAt(sort: Desc)])
+}
+
+model Vote {
+  id          String     @id @default(uuid()) @db.Uuid
+  proposalId  String     @db.Uuid
+  clubId      String     @db.Uuid
+  voterUserId String     @db.Uuid
+  choice      VoteChoice
+  comment     String?
+  castAt      DateTime   @default(now())
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  club     Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  voter    User     @relation("vote_user", fields: [voterUserId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, voterUserId])
+  @@index([proposalId])
+  @@index([clubId, castAt(sort: Desc)])
+}
+
+model TreasuryAccount {
+  id             String   @id @default(uuid()) @db.Uuid
+  clubId         String   @unique @db.Uuid
+  currencyCode   String   @default("INR") @db.Char(3)
+  currentBalance Decimal  @default(0) @db.Decimal(14, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  club         Club                  @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  transactions TreasuryTransaction[]
+}
+
+model TreasuryTransaction {
+  id                String          @id @default(uuid()) @db.Uuid
+  treasuryAccountId String          @db.Uuid
+  clubId            String          @db.Uuid
+  proposalId        String?         @db.Uuid
+  txnType           TreasuryTxnType
+  amount            Decimal         @db.Decimal(14, 2)
+  note              String?
+  performedById     String?         @db.Uuid
+  createdAt         DateTime        @default(now())
+
+  treasuryAccount TreasuryAccount @relation(fields: [treasuryAccountId], references: [id], onDelete: Cascade)
+  club            Club            @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  proposal        Proposal?       @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  performedBy     User?           @relation("treasury_actor", fields: [performedById], references: [id])
+
+  @@index([treasuryAccountId, createdAt(sort: Desc)])
+  @@index([clubId, createdAt(sort: Desc)])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  clubId      String?  @db.Uuid
+  actorUserId String?  @db.Uuid
+  action      String   @db.VarChar(80)
+  entityType  String   @db.VarChar(50)
+  entityId    String?  @db.Uuid
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  club      Club? @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  actorUser User? @relation("audit_actor", fields: [actorUserId], references: [id])
+
+  @@index([clubId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+}

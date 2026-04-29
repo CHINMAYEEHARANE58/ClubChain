@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clubchain-config
+  namespace: clubchain
+data:
+  NODE_ENV: "production"
+  PORT: "8080"
+  ACCESS_TOKEN_TTL: "15m"
+  REFRESH_TOKEN_TTL: "7d"
+  ALLOWED_EMAIL_DOMAIN: "college.edu"
+  CORS_ORIGIN: "https://clubchain.example.edu"

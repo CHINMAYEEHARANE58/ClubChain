@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clubchain-backend
+  namespace: clubchain
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: clubchain-backend
+  template:
+    metadata:
+      labels:
+        app: clubchain-backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/YOUR_ORG/clubchain-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: clubchain-config
+            - secretRef:
+                name: clubchain-secrets
+          resources:
+            requests:
+              cpu: "150m"
+              memory: "256Mi"
+            limits:
+              cpu: "600m"
+              memory: "768Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10

@@ -1,0 +1,115 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: clubchain-production
+  cancel-in-progress: false
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    outputs:
+      backend_image: ${{ steps.out.outputs.backend_image }}
+      frontend_image: ${{ steps.out.outputs.frontend_image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute metadata
+        id: meta
+        run: |
+          OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          echo "owner=${OWNER}" >> $GITHUB_OUTPUT
+          echo "sha=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/clubchain-backend:${{ steps.meta.outputs.sha }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/clubchain-backend:latest
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          build-args: |
+            VITE_API_BASE_URL=/api/v1
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/clubchain-frontend:${{ steps.meta.outputs.sha }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/clubchain-frontend:latest
+
+      - name: Set outputs
+        id: out
+        run: |
+          echo "backend_image=ghcr.io/${{ steps.meta.outputs.owner }}/clubchain-backend:${{ steps.meta.outputs.sha }}" >> $GITHUB_OUTPUT
+          echo "frontend_image=ghcr.io/${{ steps.meta.outputs.owner }}/clubchain-frontend:${{ steps.meta.outputs.sha }}" >> $GITHUB_OUTPUT
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build_and_push
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.30.0
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_B64 }}" | base64 -d > ~/.kube/config
+
+      - name: Apply base manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/secret.yaml
+          kubectl apply -f k8s/backend-service.yaml
+          kubectl apply -f k8s/frontend-service.yaml
+          kubectl apply -f k8s/backend-deployment.yaml
+          kubectl apply -f k8s/frontend-deployment.yaml
+          kubectl apply -f k8s/ingress.yaml
+          kubectl apply -f k8s/hpa-backend.yaml
+
+      - name: Update images
+        run: |
+          kubectl -n clubchain set image deployment/clubchain-backend backend=${{ needs.build_and_push.outputs.backend_image }}
+          kubectl -n clubchain set image deployment/clubchain-frontend frontend=${{ needs.build_and_push.outputs.frontend_image }}
+
+      - name: Run database migration job
+        run: |
+          kubectl -n clubchain delete job clubchain-db-migrate --ignore-not-found
+          sed "s|ghcr.io/YOUR_ORG/clubchain-backend:latest|${{ needs.build_and_push.outputs.backend_image }}|g" k8s/job-migrate.yaml | kubectl apply -f -
+          kubectl -n clubchain wait --for=condition=complete job/clubchain-db-migrate --timeout=240s
+
+      - name: Wait for rollout
+        run: |
+          kubectl -n clubchain rollout status deployment/clubchain-backend --timeout=240s
+          kubectl -n clubchain rollout status deployment/clubchain-frontend --timeout=240s

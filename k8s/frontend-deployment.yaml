@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clubchain-frontend
+  namespace: clubchain
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: clubchain-frontend
+  template:
+    metadata:
+      labels:
+        app: clubchain-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/YOUR_ORG/clubchain-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "96Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 8
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 20
+            periodSeconds: 10

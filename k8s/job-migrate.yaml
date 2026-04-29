@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clubchain-db-migrate
+  namespace: clubchain
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ghcr.io/YOUR_ORG/clubchain-backend:latest
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "npx prisma migrate deploy"]
+          envFrom:
+            - configMapRef:
+                name: clubchain-config
+            - secretRef:
+                name: clubchain-secrets
