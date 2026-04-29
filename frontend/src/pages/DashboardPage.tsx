@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { useParams } from "react-router-dom";
 import {
   CartesianGrid,
@@ -11,6 +12,7 @@ import {
   YAxis
 } from "recharts";
 import { analyticsOverviewApi, votingTrendsApi } from "../api/analytics.api";
+import { listProposalsApi } from "../api/proposals.api";
 
 export const DashboardPage = () => {
   const { clubId = "" } = useParams();
@@ -25,10 +27,47 @@ export const DashboardPage = () => {
     queryFn: () => votingTrendsApi(clubId, "30d")
   });
 
+  const proposalsQuery = useQuery({
+    queryKey: ["dashboard-proposals", clubId],
+    queryFn: () => listProposalsApi(clubId, { limit: 6 })
+  });
+
   const overview = overviewQuery.data;
 
   return (
     <div className="app-shell">
+      <div className="card">
+        <div className="section-header">
+          <div>
+            <h3 className="section-title">Active Proposals First</h3>
+            <p className="section-subtitle">Latest proposals and live vote count so members can take action immediately.</p>
+          </div>
+        </div>
+
+        {proposalsQuery.isLoading && <p className="helper">Loading proposals...</p>}
+
+        {proposalsQuery.data?.data?.length ? (
+          <div className="proposal-grid">
+            {proposalsQuery.data.data.map((proposal: any) => (
+              <Link
+                key={proposal.id}
+                to={"/clubs/" + clubId + "/proposals/" + proposal.id}
+                className="proposal-card"
+              >
+                <div className="proposal-card-top">
+                  <span className="badge" data-status={proposal.status}>{proposal.status}</span>
+                  <strong>{proposal._count?.votes ?? 0} votes</strong>
+                </div>
+                <h4>{proposal.title}</h4>
+                <p>{proposal.description.slice(0, 108)}...</p>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          !proposalsQuery.isLoading && <div className="empty-state">No proposals yet for this club.</div>
+        )}
+      </div>
+
       <div className="card">
         <div className="section-header">
           <div>

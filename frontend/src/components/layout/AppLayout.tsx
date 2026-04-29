@@ -31,7 +31,9 @@ export const AppLayout = () => {
     <div className="container app-shell">
       <div className="card app-hero">
         <div>
-          <h2 className="app-title">ClubChain DAO Governance</h2>
+          <h2 className="app-title">
+            ClubChain DAO <span className="title-animated">Governance</span>
+          </h2>
           <p>Transparent student-club proposals, voting, and treasury activity.</p>
         </div>
 
@@ -48,6 +50,23 @@ export const AppLayout = () => {
               Logout
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="card carousel-strip">
+        <div className="carousel-track">
+          <span>Live Voting</span>
+          <span>Treasury Insights</span>
+          <span>Role-based Access</span>
+          <span>Proposal Workflow</span>
+          <span>Audit Trail</span>
+          <span>Multi-club Dashboard</span>
+          <span>Live Voting</span>
+          <span>Treasury Insights</span>
+          <span>Role-based Access</span>
+          <span>Proposal Workflow</span>
+          <span>Audit Trail</span>
+          <span>Multi-club Dashboard</span>
         </div>
       </div>
 

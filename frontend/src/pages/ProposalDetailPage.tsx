@@ -191,12 +191,32 @@ export const ProposalDetailPage = () => {
                   <p className="section-subtitle">Each member can vote once per proposal.</p>
                 </div>
               </div>
-              <label>Choice</label>
-              <select value={voteChoice} onChange={(e) => setVoteChoice(e.target.value as "FOR" | "AGAINST" | "ABSTAIN")}>
-                <option value="FOR">FOR</option>
-                <option value="AGAINST">AGAINST</option>
-                <option value="ABSTAIN">ABSTAIN</option>
-              </select>
+              <div className="vote-arrow-panel">
+                <button
+                  type="button"
+                  className={"vote-arrow up" + (voteChoice === "FOR" ? " active" : "")}
+                  onClick={() => setVoteChoice("FOR")}
+                  aria-label="Vote For"
+                >
+                  ▲
+                </button>
+                <div className="vote-arrow-choice">{voteChoice}</div>
+                <button
+                  type="button"
+                  className={"vote-arrow down" + (voteChoice === "AGAINST" ? " active" : "")}
+                  onClick={() => setVoteChoice("AGAINST")}
+                  aria-label="Vote Against"
+                >
+                  ▼
+                </button>
+                <button
+                  type="button"
+                  className={"vote-neutral" + (voteChoice === "ABSTAIN" ? " active" : "")}
+                  onClick={() => setVoteChoice("ABSTAIN")}
+                >
+                  Abstain
+                </button>
+              </div>
               <label>Comment (optional)</label>
               <textarea value={voteComment} onChange={(e) => setVoteComment(e.target.value)} />
               <button onClick={() => voteMutation.mutate()} disabled={voteMutation.isPending}>

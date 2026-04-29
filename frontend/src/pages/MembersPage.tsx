@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { addMemberApi, listMembersApi } from "../api/clubs.api";
-import { RoleGuard } from "../components/common/RoleGuard";
+import { RestrictionModal } from "../components/common/RestrictionModal";
 import { useCurrentRole } from "../hooks/useCurrentRole";
 
 export const MembersPage = () => {
@@ -13,6 +13,8 @@ export const MembersPage = () => {
   const [collegeEmail, setCollegeEmail] = useState("");
   const [newRole, setNewRole] = useState<"ADMIN" | "CORE_MEMBER" | "MEMBER">("MEMBER");
   const [error, setError] = useState("");
+  const [showRestricted, setShowRestricted] = useState(false);
+  const canManageMembers = role === "ADMIN";
 
   const membersQuery = useQuery({
     queryKey: ["members", clubId],
@@ -32,7 +34,7 @@ export const MembersPage = () => {
 
   return (
     <div className="app-shell">
-      <RoleGuard role={role} allowed={["ADMIN"]}>
+      {canManageMembers ? (
         <div className="card">
           <div className="section-header">
             <div>
@@ -60,7 +62,19 @@ export const MembersPage = () => {
             {addMemberMutation.isPending ? "Adding..." : "Add Member"}
           </button>
         </div>
-      </RoleGuard>
+      ) : (
+        <div className="card">
+          <div className="section-header">
+            <div>
+              <h4 className="section-title">Member Management</h4>
+              <p className="section-subtitle">Adding or changing members is restricted for your role.</p>
+            </div>
+          </div>
+          <button className="secondary" onClick={() => setShowRestricted(true)}>
+            Why is this restricted?
+          </button>
+        </div>
+      )}
 
       <div className="card">
         <div className="section-header">
@@ -97,6 +111,17 @@ export const MembersPage = () => {
       </div>
 
       {error && <div className="error-banner">{error}</div>}
+
+      <RestrictionModal
+        open={showRestricted}
+        onClose={() => setShowRestricted(false)}
+        title="Member Management Restricted"
+        reasons={[
+          "Only Admin role can add or update club memberships.",
+          "This protects role escalation and keeps governance secure.",
+          "Contact your club admin if you need this permission."
+        ]}
+      />
     </div>
   );
 };

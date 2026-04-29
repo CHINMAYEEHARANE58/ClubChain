@@ -1,12 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { listProposalsApi } from "../api/proposals.api";
-import { RoleGuard } from "../components/common/RoleGuard";
+import { RestrictionModal } from "../components/common/RestrictionModal";
 import { useCurrentRole } from "../hooks/useCurrentRole";
 
 export const ProposalListPage = () => {
   const { clubId = "" } = useParams();
   const role = useCurrentRole(clubId);
+  const [showRestricted, setShowRestricted] = useState(false);
+  const canCreate = role === "ADMIN" || role === "CORE_MEMBER";
 
   const proposalsQuery = useQuery({
     queryKey: ["proposals", clubId],
@@ -21,11 +24,15 @@ export const ProposalListPage = () => {
             <h3 className="section-title">Proposals</h3>
             <p className="section-subtitle">Track active and historical governance decisions.</p>
           </div>
-          <RoleGuard role={role} allowed={["ADMIN", "CORE_MEMBER"]}>
+          {canCreate ? (
             <Link className="action-link" to={"/clubs/" + clubId + "/proposals/new"}>
               Create Proposal
             </Link>
-          </RoleGuard>
+          ) : (
+            <button className="secondary" onClick={() => setShowRestricted(true)}>
+              Create Proposal (Restricted)
+            </button>
+          )}
         </div>
       </div>
 
@@ -63,6 +70,17 @@ export const ProposalListPage = () => {
           !proposalsQuery.isLoading && <div className="empty-state">No proposals yet.</div>
         )}
       </div>
+
+      <RestrictionModal
+        open={showRestricted}
+        onClose={() => setShowRestricted(false)}
+        title="Create Proposal Restricted"
+        reasons={[
+          "Only Admin and Core Member roles can create proposals.",
+          "You can still review and vote on active proposals with your current permissions.",
+          "Ask a club admin to upgrade your role if needed."
+        ]}
+      />
     </div>
   );
 };

@@ -6,7 +6,7 @@ import {
   getTreasuryApi,
   listTreasuryTransactionsApi
 } from "../api/treasury.api";
-import { RoleGuard } from "../components/common/RoleGuard";
+import { RestrictionModal } from "../components/common/RestrictionModal";
 import { useCurrentRole } from "../hooks/useCurrentRole";
 
 export const TreasuryPage = () => {
@@ -18,6 +18,8 @@ export const TreasuryPage = () => {
   const [amount, setAmount] = useState(0);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const [showRestricted, setShowRestricted] = useState(false);
+  const canManageTreasury = role === "ADMIN";
 
   const treasuryQuery = useQuery({
     queryKey: ["treasury", clubId],
@@ -69,7 +71,7 @@ export const TreasuryPage = () => {
         )}
       </div>
 
-      <RoleGuard role={role} allowed={["ADMIN"]}>
+      {canManageTreasury ? (
         <div className="card">
           <div className="section-header">
             <div>
@@ -100,7 +102,19 @@ export const TreasuryPage = () => {
             {transactionMutation.isPending ? "Saving..." : "Save Transaction"}
           </button>
         </div>
-      </RoleGuard>
+      ) : (
+        <div className="card">
+          <div className="section-header">
+            <div>
+              <h4 className="section-title">Add Transaction</h4>
+              <p className="section-subtitle">Only admins can submit treasury credits and debits.</p>
+            </div>
+          </div>
+          <button className="secondary" onClick={() => setShowRestricted(true)}>
+            Why is this restricted?
+          </button>
+        </div>
+      )}
 
       <div className="card">
         <h4 className="section-title" style={{ marginBottom: "0.8rem" }}>Transactions</h4>
@@ -133,6 +147,17 @@ export const TreasuryPage = () => {
       </div>
 
       {error && <div className="error-banner">{error}</div>}
+
+      <RestrictionModal
+        open={showRestricted}
+        onClose={() => setShowRestricted(false)}
+        title="Treasury Action Restricted"
+        reasons={[
+          "Only Admin role can create treasury transactions.",
+          "Financial actions are restricted for audit safety and accountability.",
+          "You can still view all treasury balances and history."
+        ]}
+      />
     </div>
   );
 };
